@@ -1,0 +1,1594 @@
+<?php
+
+/**
+ * VoucherTransaction.php
+ * 
+ * Transaction functionalities
+ * 
+ * Controller version 2.0
+ * 
+ * @category   Controller
+ * @package    Common
+ * @subpackage Interfaces
+ * @copyright  2010 - 2020 The Asset Vantage Pvt. Ltd.
+ * @license    http://www.assetvantage.com/license/3_01.txt  AV License 3.01
+ * @since      File available since Release 2.0.0
+ * @version    GIT: 0.1
+ */
+
+namespace AssetVantage\Controller\Common\Transaction;
+
+class ContractNoteUpload extends Transaction {
+
+    /**
+     * __construct() is the magic method name for the constructor. 
+     * The constructor is called on an object after it has been created, and used to put initialisation code, etc. 
+     */
+    public function __construct($di) {
+        parent::__construct($di);
+    }
+
+    /**
+     * __destruct() is the magic method name for the destructor. 
+     * The destruct is called on an object which is about to destroy
+     */
+    public function __destruct() {
+        parent::__destruct();
+    }
+
+    /**
+     * Method for export to file
+     */
+    public function handlePdfAnandRathi($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO.\s+(\d*)/';
+        $commondata['contractNameMatch'] = '/Anand\s*Rathi\s*/';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+(\w{3}\s+\d{1,2}\s+\d{4})/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO.\s+(\d*)/';
+        $commondata['brokercode'] = '/UCC\s+Code\:\s+([A-Za-z\d\/]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+turnover\s+Fees\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/CGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/SGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/IGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['UTGST_match'] = '/UTGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['ExchangeNse_match'] = '/NSE\s+\-\s+CAPITAL\s+\-\s+Normal/';
+        $commondata['ExchangeBse_match'] = '/BSE\s+\-\s+CAPITAL/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(BUY|SELL)\s+\s+([\d\,\.\-]*)\s+([\w]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 13;
+        $position['contractNoteName'] = 'Anand Rathi';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 9;
+        $position['brokerage'] = 10;
+        $position['netrateperunit'] = 11;
+        $position['nettotalbeforelevis'] = 13;
+        $position['amount'] = 13;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    private function getAnandRathiNseArray($matches, $units, $brokerageperunit, $txntype, $transactionDate, $contractNoteNumber, $entityid, $exchange, $settlement_number, $row) {
+        $param = array();
+
+        $param['contractnotenumber'] = $contractNoteNumber;
+        $param['entityid'] = $entityid;
+        $param['transactiondate'] = $transactionDate;
+        $param['exchange'] = $exchange;
+        $param['settlementno'] = $settlement_number;
+        $param['brokername'] = 'Anand Rathi';
+        $param['orderno'] = $matches[1][0];
+        $param['ordertime'] = $matches[2][0];
+        $param['tradeno'] = $matches[3][0];
+        $param['tradetime'] = $matches[4][0];
+        $param['scripname'] = $matches[5][0];
+        $param['transactiontype'] = $txntype;
+        $param['units'] = $units;
+        $param['grossrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[9][0]));
+        $param['brokerageperunit'] = $brokerageperunit;
+        $param['netrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[11][0]));
+        $param['nettotalbeforelevis'] = \floatval(\preg_replace('/,/', '', $matches[13][0]));
+        $param['amount'] = \floatval(\preg_replace('/,/', '', $matches[13][0]));
+        $param['netamount'] = 0;
+        $param['row'] = $row;
+
+        return $param;
+    }
+
+    public function getcommoncalculation($totalservicetax, $totalstt, $totaltransactioncharges, $totalstampduty, $totalothercharges, $totalamount, $param, $gst) {
+
+        $param = array_values($param);
+        $scriprowcnt = count($param);
+        $totalbrokerage = 0;
+        $totalbrokerage = array_sum(array_column($param, 'brokerageperunit'));
+        $servicetaxDenomination = $totalamount != 0 ? $totalservicetax / $totalamount : 0;
+        $sttDenomination = $totalamount != 0 ? $totalstt / $totalamount : 0;
+        $transactionchargesDenomination = $totalamount != 0 ? $totaltransactioncharges / $totalamount : 0;
+        $stampdutyDenomination = $totalamount != 0 ? $totalstampduty / $totalamount : 0;
+        $totCGST = isset($gst['CGST']) ? $gst['CGST'] : 0;
+        $totUTGST = isset($gst['UTGST']) ? $gst['UTGST'] : 0;
+        $totIGST = isset($gst['IGST']) ? $gst['IGST'] : 0;
+        $totSGST = isset($gst['SGST']) ? str_replace(',', '', $gst['SGST']) : 0;
+        $tot_brok_transaction = 0;
+        $tot_brok_transaction = $totalbrokerage + $totaltransactioncharges;
+        for ($j = 0; $j < $scriprowcnt; $j++) {
+            $brokerage = $param[$j]['brokerageperunit'];
+//            $brokerageperunit = ($brokerage / $param[$j]['units']);
+            $param[$j]['servicetax'] = ($servicetaxDenomination != 0) ? ($param[$j]['amount'] * $servicetaxDenomination) : 0;
+            $param[$j]['sttcharges'] = ($sttDenomination != 0) ? ($param[$j]['amount'] * $sttDenomination) : 0;
+            $param[$j]['transactioncharges'] = ($transactionchargesDenomination != 0) ? ($param[$j]['amount'] * $transactionchargesDenomination) : 0;
+            $param[$j]['stampduty'] = $stampdutyDenomination != 0 ? ($param[$j]['amount'] * $stampdutyDenomination) : 0;
+            $param[$j]['othercharges'] = ($totalothercharges != 0) ? (($totalothercharges / $totalamount) * ($param[$j]['amount'])) : 0;
+            $param[$j]['CGST'] = ($totCGST != 0) ? ($totCGST / ($tot_brok_transaction) * ($brokerage + $param[$j]['transactioncharges'])) : 0;
+            $param[$j]['UTGST'] = ($totUTGST != 0) ? ($totUTGST / ($tot_brok_transaction) * ($brokerage + $param[$j]['transactioncharges'])) : 0;
+            $param[$j]['IGST'] = ($totIGST != 0) ? ($totIGST / ($tot_brok_transaction) * ($brokerage + $param[$j]['transactioncharges'])) : 0;
+            $param[$j]['SGST'] = ($totSGST != 0) ? ($totSGST / ($tot_brok_transaction) * ($brokerage + $param[$j]['transactioncharges'])) : 0;
+            $param[$j]['totCGST'] = isset($totCGST) ? $totCGST : 0;
+            $param[$j]['totUTGST'] = isset($totUTGST) ? $totUTGST : 0;
+            $param[$j]['totIGST'] = isset($totIGST) ? $totIGST : 0;
+            $param[$j]['totSGST'] = isset($totSGST) ? $totSGST : 0;
+            $param[$j]['totalservicetax'] = isset($totalservicetax) ? $totalservicetax : 0;
+            $param[$j]['totalstt'] = isset($totalstt) ? $totalstt : 0;
+            $param[$j]['totaltransactioncharges'] = isset($totaltransactioncharges) ? $totaltransactioncharges : 0;
+            $param[$j]['totalstampduty'] = isset($totalstampduty) ? $totalstampduty : 0;
+            $param[$j]['totalothercharges'] = isset($totalothercharges) ? $totalothercharges : 0;
+            $param[$j]['scripwisebrokerage'] = isset($totalothercharges) ? ($brokerage / $param[$j]['units']) : 0;
+            $param[$j]['netamount'] = 0; //$netamount; Other Charges = ((KKC+SBC) / total net amount) * net amount
+            $param[$j]['typegrouping'] = 0;
+        }
+
+        return $param;
+    }
+
+    public function commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position) {
+
+        $arrNSE = array();
+        $arrBSE = array();
+        $paramNSE = 0;
+        $paramBSE = 0;
+        $netamount = 0;
+        $totalamount = 0;
+        $totalservicetax = 0;
+        $totalothercharges = 0;
+        $totalservicetax1 = 0;
+        $totalstt1 = 0;
+        $totaltransactioncharges1 = 0;
+        $totaltransactioncharges = 0;
+        $totalstampduty1 = 0;
+        $totalothercharges1 = 0;
+        $totalamount1 = 0;
+        $tdate = '';
+        $totamount = 0;
+        $param = array();
+        $gst = array();
+        $gst1 = array();
+        $exchange = '';
+        $offset = 0;
+        $row = 1;
+
+
+
+        $nsefusequence = isset($commondata['nsefusequence']) ? $commondata['nsefusequence'] : '';
+        $nsesequence = isset($commondata['nsesequence']) ? $commondata['nsesequence'] : '';
+        $bsensesequence = isset($commondata['bsensesequence']) ? $commondata['bsensesequence'] : '';
+
+        //key1--BSE
+        //key--NSE
+        $key = 2;
+        $key1 = 1;
+
+        if (\preg_match($bsensesequence, $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $key = 2;
+            $key1 = 1;
+        } elseif (\preg_match($nsefusequence, $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $key = 1;
+            $key1 = 2;
+        } else if (\preg_match($nsesequence, $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $key = 2;
+            $key1 = 1;
+        }
+
+
+        if (\preg_match($commondata['match_strnse'], $arrData, $match_strnse, PREG_OFFSET_CAPTURE, 0)) {
+            $exchange = 'NSE';
+        }
+
+        if (isset($commondata['contractNameMatch'])) {
+            $contractNameMatch = $commondata['contractNameMatch'];
+            if (\preg_match($contractNameMatch, $arrData, $contractname_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+                $contractnameNumber = $contractname_matched_arr;
+            } else {
+                // If contract no. not found return empty array
+                return array();
+            }
+        }
+
+        if (isset($commondata['brokercode'])) {
+            $tradingaccount = $commondata['brokercode'];
+            if (\preg_match($tradingaccount, $arrData, $contractname_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+                $position['brokercode'] = $contractname_matched_arr[1][0];
+                if ($commondata['brokercode'] = '/UCC\s&\s+\Client\s+Code\s+:\s+([A-Za-z\s\:\.\,\d]*)\s\&\s([\d]*)/') {
+                    $position['brokercode'] = $contractname_matched_arr[2][0];
+                }
+            } else {
+                // If trading account no. not found return empty array
+                return array();
+            }
+        }
+
+        $contractNoteMatch = $commondata['contractNoteMatch'];
+        $contractNoteNumber = '';
+        if (\preg_match($contractNoteMatch, $arrData, $contract_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $contractNoteNumber = $contract_matched_arr[1][0];
+        }
+
+        $transactionDateMatch = $commondata['transactionDateMatch'];
+        $transactionDate = '';
+        if (\preg_match($transactionDateMatch, $arrData, $txndate_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $transactionDate = trim($txndate_matched_arr[1][0]);
+        } else {
+            // If contract no. not found return empty array
+            return array();
+        }
+
+
+        $settlement_match = $commondata['settlement_match'];
+        $settlement_number = '';
+        if (\preg_match($settlement_match, $arrData, $settlement_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $settlement_number = $settlement_match_arr[1][0];
+        }
+
+        $stt_match = $commondata['stt_match'];
+        $totalstt = 0;
+        if (\preg_match($stt_match, $arrData, $stt_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $totalstt = (isset($stt_match_arr[$key1][0]) ? $stt_match_arr[1][0] : 0); //this is for BSE 
+            $totalstt1 = (isset($stt_match_arr[$key][0]) && $stt_match_arr[$key][0] != '' ? $stt_match_arr[$key][0] : $totalstt); // this is for NSE 
+        }
+
+        if (isset($commondata['servicetax_match'])) {
+            $servicetax_match = $commondata['servicetax_match'];
+            $totalservicetax = 0;
+            if (\preg_match($servicetax_match, $arrData, $servicetaxt_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+                $totalservicetax = (isset($servicetaxt_match_arr[$key1][0]) ? $servicetaxt_match_arr[$key1][0] : 0); //this is for BSE 
+                $totalservicetax1 = (isset($servicetaxt_match_arr[$key][0]) && $servicetaxt_match_arr[$key][0] != '' ? $servicetaxt_match_arr[$key][0] : $totalservicetax); // this is for NSE 
+            }
+        }
+//      
+        $securitytransactioncharges = 0;
+        $securitytransactioncharges1 = 0;
+        if (isset($commondata['securityturnovertax_match'])) {
+            $securityturnovertax_match = $commondata['securityturnovertax_match'];
+            if (\preg_match($securityturnovertax_match, $arrData, $securityturnovertax_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+                $securitytransactioncharges = isset($securityturnovertax_match_arr[$key1][0]) ? $securityturnovertax_match_arr[$key1][0] : 0;
+                $securitytransactioncharges1 = (isset($securityturnovertax_match_arr[$key][0]) && $securityturnovertax_match_arr[$key][0] != '' ? $securityturnovertax_match_arr[$key][0] : $securitytransactioncharges);
+            }
+        }
+
+        $transactioncharges = 0;
+        $transactioncharges1 = 0;
+        $transactioncharges_match = $commondata['transactioncharges_match'];
+        if (\preg_match($transactioncharges_match, $arrData, $transactioncharges_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $transactioncharges = isset($transactioncharges_match_arr[$key1][0]) ? $transactioncharges_match_arr[$key1][0] : 0;
+            $transactioncharges1 = isset($transactioncharges_match_arr[$key][0]) && $transactioncharges_match_arr[$key][0] != '' ? $transactioncharges_match_arr[$key][0] : $transactioncharges;
+        }
+
+        $totaltransactioncharges = $securitytransactioncharges + $transactioncharges;
+        $totaltransactioncharges1 = $securitytransactioncharges1 + $transactioncharges1;
+
+        $sebi_match = $commondata['sebi_match'];
+        $sebifees = 0;
+        $sebifees1 = 0;
+        if (\preg_match($sebi_match, $arrData, $sebi_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $sebifees = isset($sebi_match_arr[$key1][0]) ? $sebi_match_arr[$key1][0] : 0; //this is for BSE 
+            $sebifees1 = isset($sebi_match_arr[$key][0]) && $sebi_match_arr[$key][0] != '' ? $sebi_match_arr[$key][0] : $sebifees;
+        }
+
+        $ilfs_match = $commondata['ilfs_match'];
+        $ilfs = 0;
+        $ilfs1 = 0;
+        if (\preg_match($ilfs_match, $arrData, $ilfs_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $ilfs = isset($sebi_match_arr[$key1][0]) ? $ilfs_match_arr[$key1][0] : 0; //this is for BSE 
+            $ilfs1 = isset($sebi_match_arr[$key][0]) && $ilfs_match_arr[$key][0] != '' ? $ilfs_match_arr[$key][0] : $ilfs;
+        }
+
+        $sebifees = $sebifees + $ilfs;
+        $sebifees1 = $sebifees1 + $ilfs1;
+
+        $StampDuty_match = $commondata['StampDuty_match'];
+        $totalstampduty = 0;
+        if (\preg_match($StampDuty_match, $arrData, $StampDuty_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $totalstampduty = isset($StampDuty_match_arr[$key1][0]) ? $StampDuty_match_arr[$key1][0] : 0; //this is for BSE 
+            $totalstampduty1 = isset($StampDuty_match_arr[$key][0]) && $StampDuty_match_arr[$key][0] != '' ? $StampDuty_match_arr[$key][0] : $totalstampduty;
+        }
+        $StampDuty_match = $commondata['StampDuty_match'];
+        if ($totalstampduty == '' || $totalstampduty == 0) {
+            if (\preg_match_all($StampDuty_match, $arrData, $StampDuty_match_arr)) {
+                $totalstampduty = isset($StampDuty_match_arr[$key1][1]) ? $StampDuty_match_arr[$key1][1] : 0; //this is for BSE 
+                $totalstampduty1 = isset($StampDuty_match_arr[$key][1]) && $StampDuty_match_arr[$key][1] != '' ? $StampDuty_match_arr[$key][0] : $totalstampduty;
+            }
+        }
+
+        $OtherCharg_match = $commondata['OtherCharg_match'];
+        if (\preg_match($OtherCharg_match, $arrData, $OtherCharg_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $totalothercharges = $OtherCharg_match_arr[$key1][0]; //this is for BSE 
+            $totalothercharges1 = isset($OtherCharg_match_arr[$key][0]) && $OtherCharg_match_arr[$key][0] != '' ? $OtherCharg_match_arr[$key][0] : $totalothercharges;
+        }
+
+        if (isset($commondata['OtherChag_match'])) {
+            $OtherCharg_match = $commondata['OtherChag_match'];
+            if (\preg_match_all($OtherCharg_match, $arrData, $OtherCharg_match_arr)) {
+                $totalothercharges += $OtherCharg_match_arr[$key1][0] + $OtherCharg_match_arr[$key1][1];
+                $totalothercharges1 += $OtherCharg_match_arr[$key][0] + $OtherCharg_match_arr[$key][1];
+            }
+        }
+
+
+        $CGST_match = $commondata['CGST_match'];
+        if (\preg_match($CGST_match, $arrData, $CGST_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $gst['CGST'] = isset($CGST_match_arr[$key1][0]) ? $CGST_match_arr[$key1][0] : 0; //this is for BSE 
+            $gst1['CGST'] = isset($CGST_match_arr[$key][0]) && $CGST_match_arr[$key][0] != '' ? $CGST_match_arr[$key][0] : $gst['CGST'];
+        }
+
+        $SGST_match = $commondata['SGST_match'];
+        if (\preg_match($SGST_match, $arrData, $SGST_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $gst['SGST'] = isset($SGST_match_arr[$key1][0]) ? $SGST_match_arr[$key1][0] : 0; //this is for BSE 
+            $gst1['SGST'] = isset($SGST_match_arr[$key][0]) && $SGST_match_arr[$key][0] != '' ? $SGST_match_arr[$key][0] : $gst['SGST'];
+        }
+
+        $IGST_match = $commondata['IGST_match'];
+        if (\preg_match($IGST_match, $arrData, $IGST_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $gst['IGST'] = isset($IGST_match_arr[$key1][0]) ? $IGST_match_arr[$key1][0] : 0; //this is for BSE 
+            $gst1['IGST'] = isset($IGST_match_arr[$key][0]) && $IGST_match_arr[$key][0] != '' ? $IGST_match_arr[$key][0] : $gst['IGST'];
+        }
+
+
+        $UTGST_match = $commondata['UTGST_match'];
+        if (\preg_match($UTGST_match, $arrData, $UTGST_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $gst['UTGST'] = isset($UTGST_match_arr[$key1][0]) ? $UTGST_match_arr[$key1][0] : 0; //this is for BSE 
+            $gst1['UTGST'] = isset($UTGST_match_arr[$key][0]) && $UTGST_match_arr[$key][0] != '' ? $UTGST_match_arr[$key][0] : $gst['UTGST'];
+        }
+
+        if ($exchange == 'NSE') {
+            $match_str = $commondata['match_strnse'];
+        } else {
+            $match_str = $commondata['match_str'];
+        }
+        $valid = '';
+        while (\preg_match($match_str, $arrData, $matches, PREG_OFFSET_CAPTURE, $offset)) {
+            
+            $NSEexchange_str = $commondata['ExchangeNse_match'];
+            $BSEexchange_str = $commondata['ExchangeBse_match'];
+           
+            if (\preg_match($NSEexchange_str, \substr($arrData, 0, $matches[$commondata['count']][1]), $exchange_match_arr, PREG_OFFSET_CAPTURE, $offset)) {
+                $exchange = 'NSE';
+            }
+            if (\preg_match($BSEexchange_str, \substr($arrData, 0, $matches[$commondata['count']][1]), $exchange_match_arr, PREG_OFFSET_CAPTURE, $offset)) {
+                $exchange = 'BSE';
+            }else{
+                $valid = 1;
+            }
+           
+            if ($matches[$position['txntype']][0] == 'SELL' || $matches[$position['txntype']][0] == 'Sell' || $matches[$position['txntype']][0] == 'S') {
+                $txntype = 'Sell';
+            } else {
+                $txntype = 'Buy';
+            }
+            $units = \intval(\preg_replace('/,/', '', $matches[$position['units']][0]));
+            $units = \abs($units);
+            $brokerage = \floatval(\preg_replace('/,/', '', $matches[$position['brokerage']][0]));
+            $brokerageperunit = $brokerage * $units;
+            if ($exchange == 'BSE' && $valid != 1) {
+                $arrBSE[] = $this->getCommonNseBseArray($matches, $units, $brokerageperunit, $txntype, $transactionDate, $contractNoteNumber, $entityid, $exchange, $settlement_number, $row, $position);
+            } else if ($exchange == 'NSE') {
+                $arrNSE[] = $this->getCommonNseBseArray($matches, $units, $brokerageperunit, $txntype, $transactionDate, $contractNoteNumber, $entityid, $exchange, $settlement_number, $row, $position);
+            }
+            $row++;
+            $offset = $matches[$commondata['count']][1];
+        }
+        if (isset($commondata['stt_totalmatch'])) {
+            $totalsttcharge = $commondata['stt_totalmatch'];
+            preg_match_all($totalsttcharge, $arrData, $matches, PREG_SET_ORDER);
+
+            for ($i = 0; $i < count($matches); $i++) {
+                if ($exchange == 'NSE') {
+                    $totalstt1 += str_replace(',', '', $matches[$i][1]);
+                } else {
+                    $totalstt += str_replace(',', '', $matches[$i][1]);
+                }
+            }
+        }
+        if (count($arrBSE) > 0) {
+            //this is for BSE 
+            $totalamount = array_sum(array_column($arrBSE, 'amount'));
+            $totaltransactioncharges += $sebifees;
+            $arrBSE = $this->getcommoncalculation($totalservicetax, $totalstt, $totaltransactioncharges, $totalstampduty, $totalothercharges, $totalamount, $arrBSE, $gst);
+        }
+        if (count($arrNSE) > 0) {
+            //this is for NSE $arrData
+            $totalamount1 = array_sum(array_column($arrNSE, 'amount'));
+            $totaltransactioncharges1 += $sebifees1;
+            $arrNSE = $this->getcommoncalculation($totalservicetax1, $totalstt1, $totaltransactioncharges1, $totalstampduty1, $totalothercharges1, $totalamount1, $arrNSE, $gst1);
+        }
+        $param = \array_merge($arrBSE, $arrNSE);
+        return $param;
+    }
+
+    public function handlePdfBPEquitiesPvtLtd($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\s+No\s+\:\s+(\d*)/';
+        $commondata['contractNameMatch'] = '/BP\s*EQUITIES\s*PVT\s*LTD/';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+\:\s+(\d{2}\/\d{2}\/\d{4})/';
+//        $commondata['settlement_match'] = '/Settlement\s+No\s+\:\s+(\w{2}\-\d*)/';
+        $commondata['settlement_match'] = '/Settlement\s+No\s+\:\s+([A-Za-z\d\.\(\)\-\&]*)/';
+        $commondata['stt_match'] = '/STT\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['brokercode'] = '/UCC\/Client\s+Code\s+:\s+([A-Za-z\d\/]*)/';
+        $commondata['transactioncharges_match'] = '/Transaction\s+Charges\s+\[Special\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        if (\preg_match($commondata['transactioncharges_match'], $arrData, $transactioncharges_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $transactioncharges = isset($transactioncharges_match_arr[1][0]) ? $transactioncharges_match_arr[1][0] : 0;
+        }
+
+        if ($transactioncharges != 0) {
+            $commondata['transactioncharges_match'] = '/Transaction\s+Charges\s+\[Special\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        } else {
+            $commondata['transactioncharges_match'] = '/Transaction\s+Charges\s+\[Normal\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        }
+
+        $commondata['sebi_match'] = '/SEBI\s+FEES\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/a^/'; // this for nothing match in contract note 
+        $commondata['OtherCharg_match'] = '/Other\s+Chrgs\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['OtherChag_match'] = '/Other\s+Chgs\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['CGST_match'] = '/Central\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        if (\preg_match($commondata['CGST_match'], $arrData, $gst_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $gst = isset($gst_match_arr[1][0]) ? $gst_match_arr[1][0] : 0;
+        }
+        if ($gst != 0) {
+            $commondata['CGST_match'] = '/Central\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        } else {
+            $commondata['CGST_match'] = '/Center\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        }
+        $commondata['SGST_match'] = '/State\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/a^/';   // this for nothing match in contract note 
+        $commondata['UTGST_match'] = '/a^/';   // this for nothing match in contract note 
+        $commondata['ExchangeNse_match'] = '/[^for]\sNSE\s+Capital\s+Market/';
+        $commondata['ExchangeBse_match'] = '/[^for]\sBSE\s+Capital\s+Market/';
+//        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['match_str'] = '/([\s+A-Za-z\.\(\)\-’\&]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+
+        $commondata['count'] = 7;
+        $position['contractNoteName'] = 'BP Equities Pvt Ltd';
+//        $position['orderno'] = 1;
+//        $position['ordertime'] = 2;
+//        $position['tradeno'] = 3;
+//        $position['tradetime'] = 4;
+        $position['scripname'] = 1;
+        $position['txntype'] = 2;
+        $position['units'] = 3;
+        $position['grossrateperunit'] = 4;
+        $position['brokerage'] = 5;
+        $position['netrateperunit'] = 6;
+        $position['nettotalbeforelevis'] = 7;
+        $position['amount'] = 7;
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfNarimanFinvest($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\s+No\s+:\s+([\d]*)/';
+        $commondata['contractNameMatch'] = '/NARIMAN\s*FINVEST\s*PVT\.\s*LTD\./';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+:\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settelmentdate'] = '/Settlement\s+Dt\s+:\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settlement_match'] = '/Settlement\s+No\s+:\s+([\w\d]*)/';
+        $commondata['brokercode'] = '/UCC\/Client\s+Code\s+:\s+([A-Za-z\d\/]*)/';
+        $commondata['transactioncharges_match'] = '/T\s*O\s*CHARGES\s+NEW\s+WITH\s+S\.T\.\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['securityturnovertax_match'] = '/Security\s+Turn\s+Over\s+Tax\s+([\d\.\,]*)\s+([\d\.\,]*)/';
+//        $commondata['stt_match'] = '/Security\s+Turn\s+Over\s+Tax\s+([\d\.\,]*)\s+([\d\.\,]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s*Duty\s*Delivery\s*\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['CGST_match'] = '/Central\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/State\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['sebi_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/[^for]\sNSE\s+Capital\s+Market/';
+        $commondata['ExchangeBse_match'] = '/[^for]\sBSE\s+Capital\s+Market/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+Delivery\s+([\d\.\,]*)/';
+        $commondata['count'] = 11;
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(Buy|Sell)\s+([\d\.\-]*)\s+([\d*\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+/';
+
+        $position['txntype'] = 6;
+        $position['brokerage'] = 9;
+        $position['units'] = 7;
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['grossrateperunit'] = 8;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 11;
+        $position['amount'] = 11;
+        $position['contractNoteName'] = 'Nariman Finvest';
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfAmbitCapitalContractNote($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO\.\s+([\d]*)/';
+        $commondata['contractNameMatch'] = '/Ambit\s+Capital\s+Pvt\.\s+Ltd\./';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settelmentdate'] = '/SETTLEMENT\s+DATE\.\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO\.\s+([\d]*)/';
+        $commondata['brokercode'] = '/UCC\s+Code\:\s+([A-Za-z\d\/]*)/';
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+([\d\.\,]*)\s+([\d\.\,]*)\s+([\d\.\,]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+turnover\s+Fees\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['servicetax_match'] = '/Tr\s+chgs\s+([\d\.]*)\s+([\d\.]*)/';
+        $commondata['CGST_match'] = '/a^/';
+        $commondata['SGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/NSE\s+\-\s+CAPITAL\s+\-\s+Normal/';
+        $commondata['ExchangeBse_match'] = '/BSE\s+\-\s+CAPITAL\s+\-\s+Rolling\s+Market/';
+        $commondata['count'] = 12;
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(BUY|SELL)\s+(\d*)\s+D\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+
+        $position['txntype'] = 6;
+        $position['brokerage'] = 9;
+        $position['units'] = 7;
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['grossrateperunit'] = 8;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 12;
+        $position['amount'] = 12;
+        $position['contractNoteName'] = 'Ambit Capital';
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfJMFinancialServices($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO\.\s+([\d]*)/';
+        $commondata['contractNameMatch'] = '/JM\s+FINANCIAL\s+SERVICES\s+LTD\./';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settelmentdate'] = '/SETTLEMENT\s+DATE\.\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO\.\s+([\d]*)/';
+        $commondata['brokercode'] = '/UCC\s+Code\:\s+([A-Za-z\d\/]*)/';
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+([\d\.\,]*)\s+([\d\.\,]*)/';
+        $commondata['securityturnovertax_match'] = '/SEBI\s+turnover\s+Fees\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+
+        $commondata['CGST_match'] = '/CGST\s+\(\/?\@\d*\.\d*\%?\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/SGST\s+\(\/?\@\d*\.\d*\%?\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/NSE\s+\-\s+CAPITAL\s+/';
+        $commondata['ExchangeBse_match'] = '/BSE\s+\-\s+CAPITAL\s+/';
+        $commondata['count'] = 12;
+        $commondata['nsefusequence'] = '/NSE\s+CAPITAL\s+NSE\s+FUTURES/';
+        $commondata['nsesequence'] = '/NSE\s+CAPITAL/';
+        $commondata['bsensesequence'] = '/BSE\s+CAPITAL\s+NSE\s+CAPITAL\s+NSE\s+FUTURES/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(BUY|SELL)\s+(\d*)\s+(|D)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)\s+([\d\.\-]*)/';
+        $commondata['match_strnse'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(BUY|SELL)\s+(\d*)\s+(|D)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+
+        $position['txntype'] = 6;
+        $position['brokerage'] = 10;
+        $position['units'] = 7;
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['grossrateperunit'] = 9;
+        $position['netrateperunit'] = 11;
+        $position['nettotalbeforelevis'] = 13;
+        $position['amount'] = 13;
+        $position['contractNoteName'] = 'JM Financial Services';
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    private function getCommonNseBseArray($matches, $units, $brokerageperunit, $txntype, $transactionDate, $contractNoteNumber, $entityid, $exchange, $settlement_number, $row, $position) {
+        $param = array();
+
+        $param['contractnotenumber'] = $contractNoteNumber;
+        $param['entityid'] = $entityid;
+        $param['transactiondate'] = $transactionDate;
+        $param['exchange'] = $exchange;
+        $param['settlementno'] = $settlement_number;
+        $param['brokername'] = $position['contractNoteName'];
+        $param['brokercode'] = isset($position['brokercode']) ? $position['brokercode'] : '';
+        $param['orderno'] = '';
+        $param['ordertime'] = isset($matches[$position['ordertime']]) && $matches[$position['ordertime']][0] != '' ? $matches[$position['ordertime']][0] : 0;
+        $param['tradeno'] = isset($matches[$position['tradeno']]) && $matches[$position['tradeno']][0] != '' ? $matches[$position['tradeno']][0] : 0;
+        $param['tradetime'] = '';
+        $param['netrateperunit'] = isset($position['netrateperunit']) && $position['netrateperunit'] != '' ? \floatval(\preg_replace('/,/', '', $matches[$position['netrateperunit']][0])) : 0;
+        $amount = isset($position['amount']) && $position['amount'] != '' ? \floatval(\preg_replace('/,/', '', $matches[$position['amount']][0])) : 0;
+        $scripisin = preg_replace('!\s+!', ' ', $matches[$position['scripname']][0]);
+        if (\strpos($scripisin, "-") !== FALSE) {
+            $exploadarr = \explode("-", $scripisin);
+            $scripname = \trim($exploadarr[0]);
+            $isin = \trim($exploadarr[1]);
+        }
+        // this is handel for empty brokrage in contract note 
+        if (($brokerageperunit - $param['netrateperunit']) == 0) {
+            $brokerageperunit = 0;
+            $param['netrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[$position['grossrateperunit']][0]));
+            $amount = isset($position['netrateperunit']) && $position['netrateperunit'] != '' ? \floatval(\preg_replace('/,/', '', $matches[$position['netrateperunit']][0])) : 0;
+        }
+
+
+        $param['scripname'] = isset($scripname) && $scripname != '' ? $scripname : $scripisin;
+        $param['isin'] = isset($isin) && $isin != '' ? $isin : '';
+        $param['transactiontype'] = $txntype;
+        $param['units'] = $units;
+        $param['grossrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[$position['grossrateperunit']][0]));
+        $param['brokerageperunit'] = abs($brokerageperunit);
+//        $param['netrateperunit'] = isset($position['netrateperunit']) && $position['netrateperunit'] != '' ? \floatval(\preg_replace('/,/', '', $matches[$position['netrateperunit']][0])) : 0;
+//        $param['nettotalbeforelevis'] = isset($position['nettotalbeforelevis']) && $position['nettotalbeforelevis']=='' ? \floatval(\preg_replace('/,/', '', $matches[$position['nettotalbeforelevis']][0])):$position['group_nettotalbeforelevis'];
+//        $amount = isset($position['amount']) && $position['amount'] != '' ? \floatval(\preg_replace('/,/', '', $matches[$position['amount']][0])) : 0;
+        $param['amount'] = abs($amount);
+        $param['netamount'] = 0;
+        $param['row'] = $row;
+
+        return $param;
+    }
+
+    public function commonJuliasNewContractNote($arrData, $commontransaction, $entityid, $commondata, $position) {
+        $param = array();
+        $data = array();
+        $arrBSE = array();
+        $arrNSE = array();
+        $row = 1;
+        $offset = 0;
+        $count = \count($commondata);
+        foreach ($commondata as $key => $value) {
+            if ($key != 'match_str' && $key != 'count') {
+                if (\preg_match_all($value, $arrData, $string_matched_arr)) {
+                    $data[$key] = $string_matched_arr[1];
+                }
+            }
+        }
+        if (\preg_match_all($commondata['transactiondate1'], $arrData, $string_matched_arr)) {
+            $data['transactiondate1'] = $string_matched_arr[2];
+        }
+        while (\preg_match($commondata['match_str'], $arrData, $matches, PREG_OFFSET_CAPTURE, $offset)) {
+            $exchangearray = \explode("-", $matches[1][0]);
+            $exchange = $exchangearray[0];
+            $brokerage = \floatval(\preg_replace('/,/', '', $matches[$position['brokerage']][0]));
+            $units = \intval(\preg_replace('/,/', '', $matches[$position['units']][0]));
+            $brokerageperunit = abs($brokerage * $units);
+            $txntype = $matches[$position['txntype']][0];
+            if ($exchange == 'BSE') {
+                $arrBSE[] = $this->getExchangeArray($matches, $units, $brokerageperunit, $txntype, $entityid, $exchange, $data, $position, $row);
+            } else if ($exchange == 'NSE') {
+                $arrNSE[] = $this->getExchangeArray($matches, $units, $brokerageperunit, $txntype, $entityid, $exchange, $data, $position, $row);
+            }
+            $row++;
+            $offset = $matches[$commondata['count']][1];
+        }
+        $param = \array_merge($arrBSE, $arrNSE);
+        return $param;
+    }
+
+    public function JuliasNewContractNote($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractnotenumber'] = '/CONTRACT\s+NOTE\s+NO\.\s+([A-Za-z\d\/]*)/';
+        $commondata['transactiondate'] = '/TRADE\s+DATE\s+(\d{2}\-\w{3}\-\d{4})/';
+        $commondata['transactiondate1'] = '/TRADE\s+DATE\s+Settlement\s+No\.\s+(\d*)\s+(\d{2}\-\w{3}\-\d{4})/';
+        $commondata['settlementno'] = '/Settlement\s+No\.\s+([\d]*)/';
+        $commondata['brokercode'] = '/UCC\s+Of\s+Client\s+([\d\.\,\-]*)/';
+        $commondata['sttcharges'] = '/Securities\s+Transaction\s+Tax\s+\(Rs\.\)\s+([\d\,\.\-]*)/';
+        $commondata['transactioncharges'] = '/Exchange\s+Transaction\s+Charges\s+\(Rs\.\)\s+([\d\.\,\-]*)/';
+        $commondata['sebicharges'] = '/SEBI\s+turnover\s+Fees\s+\(Rs\.\)\s+([\d\,\.\-]*)/';
+        $commondata['stampduty'] = '/Stamp\s+Duty\s+\(Rs\.\)\s+([\d\,\.\-]*)/';
+        $commondata['othercharges'] = '/Other\s+Chrgs\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['CGST'] = '/CGST\*\s+\@\d\%\s+\(Rs\)\s+([\d\.\,\-]*)/';
+        $commondata['SGST'] = '/SGST\*\s+\@\d\%\s+\(Rs\)\s+([\d\.\,\-]*)/';
+        $commondata['IGST'] = '/IGST\s+\@\d*\%\s+\(Rs\)\s+([\d\.\,\-]*)/';
+        $commondata['UTGST'] = '/UTT\*\s+\@\d\%\s+\(Rs\)\s+([\d\.\,\-]*)/';
+        $commondata['ExchangeNse'] = '/[^for]\sNSE\s+Capital\s+Market/';
+        $commondata['ExchangeBse'] = '/[^for]\sBSE\s+Capital\s+Market/';
+        $commondata['match_str'] = '/(NSE\-Capital\s+Market\s+Segment|BSE\-Equity\s+Segment)\s+As\s+per\s+Annexure\s+([\s+A-Za-z\-\d\.\'\&\@\!\(\)\{\}\*\%\$]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 11;
+
+        $position['brokername'] = 'Julius Bar';
+        $position['orderno'] = '';
+        $position['ordertime'] = '';
+        $position['tradeno'] = '';
+        $position['tradetime'] = '';
+        $position['scripname'] = 2;
+        $position['txntype'] = 3;
+        $position['units'] = 4;
+        $position['grossrateperunit'] = 5;
+        $position['brokerage'] = 6;
+        $position['netrateperunit'] = 7;
+        $position['nettotalbeforelevis'] = 8;
+        $position['amount'] = 8;
+
+        $param = $this->commonJuliasNewContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    private function getExchangeArray($matches, $units, $brokerageperunit, $txntype, $entityid, $exchange, $data, $position, $row) {
+        $param = array();
+        $param['contractnotenumber'] = $data['contractnotenumber'][$row - 1];
+        $param['entityid'] = $entityid;
+        $param['transactiondate'] = isset($data['transactiondate']) && $data['transactiondate'] != '' ? $data['transactiondate'][$row - 1] : $data['transactiondate1'][$row - 1];
+        $param['exchange'] = $exchange;
+        $param['settlementno'] = $data['settlementno'][$row - 1];
+        $param['brokername'] = $position['brokername'];
+        $param['brokercode'] = $data['brokercode'][0];
+        $param['orderno'] = '';
+        $param['ordertime'] = '';
+        $param['tradeno'] = '';
+        $param['tradetime'] = '';
+        $scripisin = $matches[$position['scripname']][0];
+        $exploadarr = \explode("-", $scripisin);
+        $param['scripname'] = \trim($exploadarr[0]);
+        $param['isin'] = \trim($exploadarr[1]);
+        $param['transactiontype'] = $txntype;
+        $param['units'] = abs($units);
+        $param['grossrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[$position['grossrateperunit']][0]));
+        $param['brokerageperunit'] = abs($brokerageperunit);
+        $param['netrateperunit'] = \floatval(\preg_replace('/,/', '', $matches[$position['netrateperunit']][0]));
+        $param['nettotalbeforelevis'] = \floatval(\preg_replace('/,/', '', $matches[$position['nettotalbeforelevis']][0]));
+        $param['amount'] = $param['nettotalbeforelevis'];
+        $param['netamount'] = 0;
+        $transactioncharges = ($data['transactioncharges'][$row - 1] + $data['sebicharges'][$row - 1]);
+        $sttcharges = isset($data['sttcharges']) ? \floatval(\preg_replace('/,/', '', $data['sttcharges'][$row - 1])) : 0;
+        $stampduty = isset($data['stampduty']) ? abs($data['stampduty'][$row - 1]) : 0;
+        $othercharges = isset($data['othercharges']) ? abs($data['othercharges'][$row - 1]) : 0;
+        $CGST = isset($data['CGST']) ? abs($data['CGST'][$row - 1]) : 0;
+        $UTGST = isset($data['UTGST']) ? abs($data['UTGST'][$row - 1]) : 0;
+        $IGST = isset($data['IGST']) ? abs($data['IGST'][$row - 1]) : 0;
+        $SGST = isset($data['SGST']) ? abs($data['SGST'][$row - 1]) : 0;
+        $param['servicetax'] = isset($data['servicetax']) ? $data['servicetax'][$row - 1] : 0;
+        $param['sttcharges'] = abs($sttcharges);
+        $param['transactioncharges'] = isset($transactioncharges) ? abs($transactioncharges) : 0;
+        $param['stampduty'] = abs($stampduty);
+        $param['othercharges'] = abs($othercharges);
+        $param['CGST'] = abs($CGST);
+        $param['UTGST'] = abs($UTGST);
+        $param['IGST'] = abs($IGST);
+        $param['SGST'] = abs($SGST);
+        $param['totCGST'] = $CGST;
+        $param['totUTGST'] = $UTGST;
+        $param['totIGST'] = $IGST;
+        $param['totSGST'] = $SGST;
+        $param['totalservicetax'] = $param['servicetax'];
+        $param['totalstt'] = abs($sttcharges);
+        $param['totaltransactioncharges'] = isset($transactioncharges) ? abs($transactioncharges) : 0;
+        $param['totalstampduty'] = abs($stampduty);
+        $param['totalothercharges'] = abs($othercharges);
+        $param['nospeculation'] = 1;
+        $param['row'] = $row;
+        return $param;
+    }
+
+    public function handlePdfEmkayGlobal($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\s+No\s+\:\s+(\d*)/';
+        $commondata['contractNameMatch'] = '/EMKAY\s*GLOBAL\s*FINANCIAL\s*SERVICES\s*LTD\./';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+\:\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['brokercode'] = '/UCC\/Client\s+Code\s+\:\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/Settlement\s+No\s+\:\s+([A-Za-z\d]*)/';
+        $commondata['stt_match'] = '/S\.\s+T\.\s+T\.\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['servicetax_match'] = '/Service\s+tax\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['transactioncharges_match'] = '';
+
+        $transactioncharges_match1 = '/Transaction\s+Charges\s\[Normal\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        if (\preg_match($transactioncharges_match1, $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $commondata['transactioncharges_match'] = '/Transaction\s+Charges\s\[Normal\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        }
+        $transactioncharges_match = '/TRANSACTION\s+CHARGES\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        if ($commondata['transactioncharges_match'] == '') {
+            if (\preg_match($transactioncharges_match, $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+                $commondata['transactioncharges_match'] = '/TRANSACTION\s+CHARGES\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+            }
+        }
+
+        $commondata['sebi_match'] = '/SEBI\s+FEES\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/STAMP_DUTY\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/Central\s+GST\s+\@\s+\d*%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/State\s+GST\s+\@\s+\d*%\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/[^for]\sNSE\s+Capital\s+Market\s+\[[A-Za-z\d\-]*\]/';
+        $commondata['ExchangeBse_match'] = '/[^for]\sBSE\s+Capital\s+Market\s+\[[A-Za-z\d\-]*\]/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 11;
+        $position['contractNoteName'] = 'EmkayGlobal';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = 9;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 11;
+        $position['amount'] = 11;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfCentrumBroking($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z\.\(\)\-’\&\d]*)\s+(B|S)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        if (\preg_match($commondata['match_str'], $arrData, $nseseq_matched_arr, PREG_OFFSET_CAPTURE, 0)) {
+            $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO\s+\:\s+(\d*)/';
+            $commondata['contractNameMatch'] = '/(Centrum|CENTRUM)\s*(Broking|BROKING)\s*(Limited|LIMITED)/';
+            $commondata['stt_match'] = '/Securities\s*Transactions\sTax\s\(Rs\.\)\s*([\d\,\.\-]*)\s+\CR\s+([\d\,\.\-]*)/';
+            $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+\(Rs\.\)\s+([\d\,\.\-]*)\s+\CR\s+([\d\,\.\-]*)/';
+            $commondata['CGST_match'] = '/CGST\*\s+RATE\:\9\%\s+AMOUNT\s+\(RS\.\)\s+([\d\,\.\-]*)\s+\DR\s+([\d\,\.\-]*)/';
+            $commondata['SGST_match'] = '/SGST\*\s+RATE\:\9\%\s+AMOUNT\s+\(RS\.\)\s+([\d\,\.\-]*)\s+\DR\s+([\d\,\.\-]*)/';
+            $commondata['sebi_match'] = '/Taxable\s+Value\s+Of\s+Supply\s+\(Sebi\s+Turnover\s+Charges\)\s+([\d\,\.\-]*)\s+\CR\s+([\d\,\.\-]*)/';
+            $commondata['ilfs_match'] = '/Taxable\s+Value\s+Of\s+Supply\s+\(Ilfs\sClearing\sChgs\)\s+([\d\,\.\-]*)\s+\CR\s+([\d\,\.\-]*)/';
+            $commondata['transactioncharges_match'] = '/Taxable\s+Value\s+Of\s+Supply\s\(Exchange\sTransactions\sCharges\)\s\(Rs\.\)\s([\d\,\.\-]*)\s+\CR\s+([\d\,\.\-]*)/';
+            $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z\.\(\)\-’\&\d]*)\s+(B|S)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+            $commondata['brokercode'] = '/UCC\s&\s+\Client\s+Code\s+:\s+([A-Za-z\s\:\.\,\d]*)\s\&\s([\d]*)/';
+            $commondata['ExchangeNse_match'] = '/NSECM\s\N\s+\d*/';
+              if (\preg_match($commondata['ExchangeNse_match'], $arrData, $Exchange_match_arr, PREG_OFFSET_CAPTURE, 0)) {
+                  $commondata['ExchangeNse_match'] = '/NSECM\s\N\s+\d*/';
+              }
+            $commondata['ExchangeBse_match'] = '/BSECM\s+[^NSECM]/';
+            $position['scripname'] = 5;
+            $position['txntype'] = 6;
+            $position['units'] = 7;
+            $position['grossrateperunit'] = 8;
+            $position['brokerage'] = 9;
+            $position['netrateperunit'] = 10;
+            $position['nettotalbeforelevis'] = 11;
+            $position['amount'] = 11;
+            $commondata['count'] = 11;
+        } else {
+
+            $commondata['contractNoteMatch'] = '/Contract\s+No\s+\:\s+(\d*)/';
+            $commondata['contractNameMatch'] = '/Centrum\s*Broking\s*Limited/';
+            $commondata['stt_match'] = '/Securities\s*Trx\.\s*Tax\s*([\d\,\.\-]*)/';
+            $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+[^will]\s+([\d\,\.\-]*)/';
+            $commondata['CGST_match'] = '/Cgst\s*\@\s*\d\s*\%\s+([\d\,\.\-]*)/';
+            $commondata['SGST_match'] = '/Sgst\s*\@\s*\d\s*\%\s+([\d\,\.\-]*)/';
+            $commondata['sebi_match'] = '/Sebi\s+Turnover\s+Fees\s*([\d\,\.\-]*)/';
+            $commondata['brokercode'] = '/UCC\s+Code\s+:\s+([A-Za-z\d\/]*)/';
+            $commondata['ExchangeNse_match'] = '/Segment\/Exchange\s*\:\s*([A-Za-z]*)\s*\-\s*NSE/';
+            $commondata['ExchangeBse_match'] = '/Segment\/Exchange\s*\:\s*([A-Za-z]*)\s*\-\s*BSE/';
+            $commondata['transactioncharges_match'] = '/Exchange\s+Trx\.\s*Charges\s*([\d\,\.\-]*)/';
+            $commondata['match_str'] = '/\*\s*Total\s*\*\s*([\s+A-Za-z\.\(\)\-’\&\d]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+            $position['scripname'] = 1;
+            $position['txntype'] = 2;
+            $position['units'] = 3;
+            $position['grossrateperunit'] = 4;
+            $position['brokerage'] = 5;
+            $position['netrateperunit'] = 7;
+            $position['nettotalbeforelevis'] = 8;
+            $position['amount'] = 8;
+            $commondata['count'] = 9;
+        }
+
+
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+\:\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['settlement_match'] = '/Settlement\s+No\s+\:\s+([A-Za-z\d]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $position['contractNoteName'] = 'Centrum Broking';
+        $position['orderno'] = '';
+        $position['ordertime'] = '';
+        $position['tradeno'] = '';
+        $position['tradetime'] = '';
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+        return $param;
+    }
+
+    public function handleHtmlVedBrothersSecurities($arrData, $commontransaction, $entityid) {
+
+        $arrval = array();
+        $param = array();
+        $totalamount = 0;
+        $totalamount1 = 0;
+        $totalservicetax = 0;
+        $totalstampduty = 0;
+        $totalothercharges = 0;
+        $totalothercharges1 = 0;
+        $totaltransactioncharges = 0;
+        $totalotherchargesnse = 0;
+        $totalotherchargesbse = 0;
+        $brokername = '';
+        $exchange = '';
+        $brokercode = '';
+        $gstnse = array();
+        $gstbse = array();
+        $arrNSE = array();
+        $arrBSE = array();
+        $arrval1 = array();
+        $arrval2 = array();
+        $totalservicetaxnse = 0;
+        $totaltransactionchargesbse = 0;
+        $totalsttbse = 0;
+        $totalstampdutybse = 0;
+        $totalservicetaxbse = 0;
+        $arrData = array_values($arrData);
+        end($arrData);         // move the internal pointer to the end of the array
+        $key = key($arrData); // fetches the key of the element pointed to by the internal
+        $count = count($arrData);
+        if (isset($arrData[0]['B']) && \strpos($arrData[0]['B'], "CONTRACT NOTE CUM TAX INVOICE") !== FALSE) {
+            $brokername = isset($arrData[1]['D']) ? \trim($arrData[1]['D']) : '';
+        }
+
+        $tradedate = '';
+        $contractNumber = '';
+        for ($row = 10; $row <= 25; $row++) {
+            if (isset($arrData[$row]['C']) && \strpos(\trim($arrData[$row]['C']), "TRADE DATE :") !== FALSE) {
+                $tradedate = \trim($arrData[$row]['D']);
+            }
+            if (isset($arrData[$row]['C']) && \strpos(\trim($arrData[$row]['C']), "Contract/Invoice Note No :") !== FALSE) {
+                $contractNumber = isset($arrData[$row]['D']) ? \trim($arrData[$row]['D']) : '';
+            }
+            if (isset($arrData[$row]['B']) && \strpos(\trim($arrData[$row]['B']), "UCC CODE") !== FALSE) {
+                $brokercodestr = isset($arrData[$row]['B']) ? \trim($arrData[$row]['B']) : '';
+                $brokercodearr = explode(':', $brokercodestr);
+                $brokercode = $brokercodearr[2];
+            }
+        }
+
+        $totalsttnse = 0;
+        $gstnse['CGST'] = 0;
+        $gstnse['SGST'] = 0;
+        $totaltransactionchargesnse = 0;
+        $sebinse = 0;
+        $sebibse = 0;
+        $totalstampdutynse = 0;
+        for ($i = 0; $i < $count; $i++) {
+//            $position = isset($arrData[$i]['E']);
+            if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i]['E']), "BSE-DEPOSITORY") !== FALSE && \stripos(\trim($arrData[$i + 2]['E']), "Securities Transaction Tax") !== FALSE) {
+                $totalsttbse = isset($arrData[$i + 2]['L']) ? $arrData[$i + 2]['L'] : 0;
+                $totalservicetaxbse = isset($arrData[$i + 3]['L']) ? $arrData[$i + 3]['L'] : 0;
+                $gstbse['CGST'] = isset($arrData[$i + 4]['L']) ? $arrData[$i + 4]['L'] : 0;
+                $gstbse['SGST'] = isset($arrData[$i + 5]['L']) ? $arrData[$i + 5]['L'] : 0;
+                $totaltransactionchargesbse = isset($arrData[$i + 6]['L']) ? $arrData[$i + 6]['L'] : 0;
+                if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i + 7]['E']), "SEBI Turnover Fees") !== FALSE) {
+                    $sebibse = isset($arrData[$i + 7]['L']) ? $arrData[$i + 7]['L'] : 0;
+                    $totalstampdutybse = isset($arrData[$i + 8]['L']) ? $arrData[$i + 8]['L'] : 0;
+                } else {
+                    $totalstampdutybse = isset($arrData[$i + 7]['L']) ? $arrData[$i + 7]['L'] : 0;
+                }
+            }
+            if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i]['E']), "NSE-NORMAL") !== FALSE && \stripos(\trim($arrData[$i + 2]['E']), "Securities Transaction Tax") !== FALSE) {
+                $totalsttnse = isset($arrData[$i + 2]['L']) ? $arrData[$i + 2]['L'] : 0;
+                if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i + 3]['E']), "S.Tax+SBC+KKC @ 0.00 % on BRK & TXN") !== FALSE) {
+                    $totalservicetaxnse = isset($arrData[$i + 3]['L']) ? $arrData[$i + 3]['L'] : 0;
+                    $gstnse['CGST'] = isset($arrData[$i + 4]['L']) ? $arrData[$i + 4]['L'] : 0;
+                    $gstnse['SGST'] = isset($arrData[$i + 5]['L']) ? $arrData[$i + 5]['L'] : 0;
+                    $totaltransactionchargesnse = isset($arrData[$i + 6]['L']) ? $arrData[$i + 6]['L'] : 0;
+                    if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i + 7]['E']), "SEBI Turnover Fees") !== FALSE) {
+                        $sebinse = isset($arrData[$i + 7]['L']) ? $arrData[$i + 7]['L'] : 0;
+                        $totalstampdutynse = isset($arrData[$i + 8]['L']) ? $arrData[$i + 8]['L'] : 0;
+                    } else {
+                        $totalstampdutynse = isset($arrData[$i + 7]['L']) ? $arrData[$i + 7]['L'] : 0;
+                    }
+                } else {
+                    $gstnse['CGST'] = isset($arrData[$i + 3]['L']) ? $arrData[$i + 3]['L'] : 0;
+                    $gstnse['SGST'] = isset($arrData[$i + 4]['L']) ? $arrData[$i + 4]['L'] : 0;
+                    $totaltransactionchargesnse = isset($arrData[$i + 5]['L']) ? $arrData[$i + 5]['L'] : 0;
+                    if (isset($arrData[$i]['E']) && \stripos(\trim($arrData[$i + 6]['E']), "SEBI Turnover Fees") !== FALSE) {
+                        $sebinse = isset($arrData[$i + 6]['L']) ? $arrData[$i + 6]['L'] : 0;
+                        $totalstampdutynse = isset($arrData[$i + 7]['L']) ? $arrData[$i + 7]['L'] : 0;
+                    } else {
+                        $totalstampdutynse = isset($arrData[$i + 6]['L']) ? $arrData[$i + 6]['L'] : 0;
+                    }
+                }
+            }
+        }
+
+        $paramarr['contractnotenumber'] = $contractNumber;
+        $paramarr['entityid'] = $entityid;
+        $paramarr['transactiondate'] = $tradedate;
+        $paramarr['brokername'] = $brokername;
+        $paramarr['brokercode'] = $brokercode;
+        $row = 0;
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($arrData[$i]['A']) && \strpos(\trim($arrData[$i]['A']), "Exchange") !== FALSE && isset($arrData[$i]['B']) && \strpos(\trim($arrData[$i]['B']), "NSE") !== FALSE) {
+                $exchange = "NSE";
+                for ($j = $i + 1; $j < $count; $j++) {
+                    if (isset($arrData[$j]['A']) && isset($arrData[$j]['B']) && isset($arrData[$j]['C']) && isset($arrData[$j]['D']) && isset($arrData[$j]['E']) && isset($arrData[$j]['F']) && isset($arrData[$j]['G']) && isset($arrData[$j]['H']) && isset($arrData[$j]['I']) && isset($arrData[$j]['J']) && isset($arrData[$j]['K']) && isset($arrData[$j]['L'])) {
+                        $arrNSE[] = $arrData[$j];
+                    }
+                    if (isset($arrData[$j]['A']) && \strpos(\trim($arrData[$j]['A']), "Exchange") !== FALSE && isset($arrData[$j]['B']) && \strpos(\trim($arrData[$j]['B']), "BSE") !== FALSE) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (count($arrNSE) > 0) {
+            $arrval1 = $this->getHtmlContractNoteCommonvalue($arrNSE, $paramarr, $exchange, $contractNumber, $row);
+            $totalamount1 = array_sum(array_column($arrval1, 'amount'));
+            $totaltransactionchargesnse += $sebinse;
+            $arrval1 = $this->getcommoncalculation($totalservicetaxnse, $totalsttnse, $totaltransactionchargesnse, $totalstampdutynse, $totalotherchargesnse, $totalamount1, $arrval1, $gstnse);
+        }
+
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($arrData[$i]['A']) && \strpos(\trim($arrData[$i]['A']), "Exchange") !== FALSE && isset($arrData[$i]['B']) && \strpos(\trim($arrData[$i]['B']), "BSE") !== FALSE) {
+
+                $exchange = "BSE";
+                for ($j = $i + 1; $j < $count; $j++) {
+                    if (isset($arrData[$j]['A']) && isset($arrData[$j]['B']) && isset($arrData[$j]['C']) && isset($arrData[$j]['D']) && isset($arrData[$j]['E']) && isset($arrData[$j]['F']) && isset($arrData[$j]['G']) && isset($arrData[$j]['H']) && isset($arrData[$j]['I']) && isset($arrData[$j]['J']) && isset($arrData[$j]['K']) && isset($arrData[$j]['L'])) {
+                        $arrBSE[] = $arrData[$j];
+                    }
+                    if (isset($arrData[$j]['A']) && \strpos(\trim($arrData[$j]['A']), "Exchange") !== FALSE && isset($arrData[$j]['B']) && \strpos(\trim($arrData[$j]['B']), "NSE") !== FALSE) {
+                        break;
+                    }
+                }
+            }
+        }
+        $row = isset($arrval1) && count($arrval1) > 0 ? count($arrval1) : 0;
+        if (count($arrBSE) > 0) {
+            $arrval2 = $this->getHtmlContractNoteCommonvalue($arrBSE, $paramarr, $exchange, $contractNumber, $row);
+            $totalamount = array_sum(array_column($arrval2, 'amount'));
+            $totaltransactionchargesbse += $sebibse;
+            $arrval2 = $this->getcommoncalculation($totalservicetaxbse, $totalsttbse, $totaltransactionchargesbse, $totalstampdutybse, $totalotherchargesbse, $totalamount, $arrval2, $gstbse);
+        }
+        $arrval = \array_merge($arrval1, $arrval2);
+//        echo '<pre>' . ' imhere ';
+//        print_r($arrval);
+//        echo '</pre>';
+//        die;
+        return $arrval;
+    }
+
+    public function getHtmlContractNoteCommonvalue($arrNSE, $paramarr, $exchange, $contractNumber, $row) {
+        $param = array();
+        $units = $price = $amount = $brokerage = 0;
+        $count1 = count($arrNSE);
+        for ($i = 0; $i < $count1; $i++) {
+            $param[$i]['contractnotenumber'] = $contractNumber;
+            $param[$i]['entityid'] = $paramarr['entityid'];
+            $param[$i]['transactiondate'] = $paramarr['transactiondate'];
+            $param[$i]['brokercode'] = $paramarr['brokercode'];
+            $param[$i]['exchange'] = $exchange;
+            $param[$i]['settlementno'] = isset($paramarr['settlementno']) ? $paramarr['settlementno'] : '';
+            $param[$i]['settlementdate'] = isset($paramarr['settlementdate']) ? $paramarr['settlementdate'] : '';
+            $param[$i]['brokername'] = $paramarr['brokername'];
+            $param[$i]['scripname'] = isset($arrNSE[$i]['E']) && $arrNSE[$i]['E'] != '' ? $arrNSE[$i]['E'] : '';
+            if (isset($arrNSE[$i]['F']) && $arrNSE[$i]['F'] != '' && (\trim($arrNSE[$i]['F']) != 'S' && \trim($arrNSE[$i]['F']) != 'Sell')) {
+                $param[$i]['transactiontype'] = 'Buy';
+            } 
+            if (isset($arrNSE[$i]['F']) && $arrNSE[$i]['F'] != '' && (\trim($arrNSE[$i]['F']) != 'B' && \trim($arrNSE[$i]['F']) != 'Buy')) {
+                $param[$i]['transactiontype'] = 'Sell';
+            }
+            if (isset($arrNSE[$i]['G']) && $arrNSE[$i]['G'] != '') {
+                $units = abs($arrNSE[$i]['G']);
+            }
+            if (isset($arrNSE[$i]['H']) && $arrNSE[$i]['H'] != '') {
+                $price = $arrNSE[$i]['H'];
+            }
+            if (isset($arrNSE[$i]['I']) && $arrNSE[$i]['I'] != '') {
+                $brokerage = $arrNSE[$i]['I'];
+            }
+            if (isset($arrNSE[$i]['L']) && $arrNSE[$i]['L'] != '') {
+                $amount = abs($arrNSE[$i]['L']);
+            }
+            $param[$i]['units'] = $units;
+            $param[$i]['grossrateperunit'] = $price;
+            $param[$i]['brokerageperunit'] = $brokerage * $units;
+            $param[$i]['netrateperunit'] = $price;
+            $param[$i]['amount'] = $amount;
+            $param[$i]['row'] = $row;
+            $row++;
+        }
+        return $param;
+    }
+
+    public function handleHtmlClobalworthSecurities($arrData, $commontransaction, $entityid) {
+//        echo '<pre style="max-height: 400px; overflow: auto;">' . __FILE__ . ' ' . __LINE__ . '<br/>';
+//        print_r($arrData);
+//        echo '</pre>';
+//        die;
+        $arrval = array();
+        $param = array();
+        $totalamount = 0;
+        $totalamount1 = 0;
+        $totalservicetax = 0;
+        $totalstampduty = 0;
+        $totalothercharges = 0;
+        $totalothercharges1 = 0;
+        $totaltransactioncharges = 0;
+        $totalotherchargesnse = 0;
+        $totalotherchargesbse = 0;
+        $brokername = '';
+        $exchange = '';
+        $brokercode = '';
+        $gstnse = array();
+        $gstbse = array();
+        $arrNSE = array();
+        $arrBSE = array();
+        $arrval1 = array();
+        $arrval2 = array();
+        $totalservicetaxnse = 0;
+        $totaltransactionchargesbse = 0;
+        $totalsttbse = 0;
+        $totalstampdutybse = 0;
+        $totalservicetaxbse = 0;
+        $arrData = array_values($arrData);
+        end($arrData);         // move the internal pointer to the end of the array
+        $key = key($arrData); // fetches the key of the element pointed to by the internal
+        $count = count($arrData);
+        if (isset($arrData[-1]['A']) && \strpos($arrData[-1]['A'], "ORIGINAL FOR RECIPIENT") !== FALSE) {
+            $brokername = isset($arrData[-1]['B']) ? \trim($arrData[-1]['B']) : '';
+        }
+
+        $tradedate = '';
+        $contractNumber = '';
+        for ($row = 17; $row <= 23; $row++) {
+            if (isset($arrData[$row]['B']) && \strpos(\trim($arrData[$row]['B']), "Trade Date.") !== FALSE) {
+                $tradedate = \trim($arrData[$row]['C']);
+            }
+            if (isset($arrData[$row]['A']) && \strpos(\trim($arrData[$row]['A']), "CONTRACT NOTE NO. :") !== FALSE) {
+                $contractNumber = isset($arrData[$row]['A']) ? \trim($arrData[$row]['A']) : '';
+                $contractNumber = explode(':', $contractNumber);
+                $contractNumber = $contractNumber[1];
+            }
+            if (isset($arrData[$row]['A']) && \strpos(\trim($arrData[$row]['A']), "Client Code:") !== FALSE) {
+                $brokercodestr = isset($arrData[$row]['A']) ? \trim($arrData[$row]['A']) : '';
+                $brokercodearr = explode(':', $brokercodestr);
+                $brokercode = $brokercodearr[2];
+            }
+        }
+
+        $totalsttnse = 0;
+        $gstnse['CGST'] = 0;
+        $gstnse['SGST'] = 0;
+        $totaltransactionchargesnse = 0;
+        $sebinse = 0;
+        $sebibse = 0;
+        $totalstampdutynse = 0;
+        for ($i = 0; $i < $count; $i++) {
+            if ((isset($arrData[$i]['I']) && \stripos(\trim($arrData[$i]['I']), "BSECM") !== FALSE && \stripos(\trim($arrData[$i + 2]['A']), "Securities Transactions Tax") !== FALSE) || (isset($arrData[$i]['J']) && \stripos(\trim($arrData[$i]['J']), "BSECM") !== FALSE && \stripos(\trim($arrData[$i + 2]['A']), "Securities Transactions Tax") !== FALSE)) {
+                if(isset($arrData[$i]['J']) && \stripos(\trim($arrData[$i]['J']), "NSECM") !== FALSE){
+                   $totalsttbse = isset($arrData[$i + 2]['I']) ? chop($arrData[$i + 2]['I'],'DR') : 0; 
+                }else{
+                    $totalsttbse = isset($arrData[$i + 2]['J']) ? chop($arrData[$i + 2]['J'],'DR') : 0;
+                }
+                
+                $gstbse['CGST'] = isset($arrData[$i + 6]['I']) ? chop($arrData[$i + 6]['I'],'DR') : chop($arrData[$i + 6]['J'],'DR');
+                $gstbse['SGST'] = isset($arrData[$i + 7]['I']) ? chop($arrData[$i + 7]['I'],'DR') : chop($arrData[$i + 7]['J'],'DR');
+                $totaltransactionchargesbse = isset($arrData[$i + 8]['I']) ? chop($arrData[$i + 8]['I'],'DR') : chop($arrData[$i + 8]['J'],'DR');
+                    $sebibse = isset($arrData[$i + 11]['I']) ? chop($arrData[$i + 11]['I'],'DR') :chop($arrData[$i + 11]['J'],'DR');
+                    $totalstampdutybse = isset($arrData[$i + 9]['I']) ? chop($arrData[$i + 9]['I'],'DR') : chop($arrData[$i + 9]['J'],'DR');
+            }
+            if (isset($arrData[$i]['J']) && \stripos(\trim($arrData[$i]['J']), "NSECM") !== FALSE && \stripos(\trim($arrData[$i + 2]['A']), "Securities Transactions Tax") !== FALSE) {
+                    
+                if(isset($arrData[$i]['I']) && \stripos(\trim($arrData[$i]['I']), "BSECM") !== FALSE){
+                    $totalsttnse = isset($arrData[$i + 2]['J']) ? $arrData[$i + 2]['J'] : 0;
+                    $gstnse['CGST'] = isset($arrData[$i + 6]['J']) ? chop($arrData[$i + 6]['J'],'DR') : 0;
+                    $gstnse['SGST'] = isset($arrData[$i + 7]['J']) ? chop($arrData[$i + 7]['J'],'DR') : 0;
+                    $totaltransactionchargesnse = isset($arrData[$i + 8]['J']) ? chop($arrData[$i + 8]['J'],'DR') : 0;
+                    $sebinse = isset($arrData[$i + 11]['J']) ? chop($arrData[$i + 11]['J'],'DR') : 0;
+                    $totalstampdutynse = isset($arrData[$i + 9]['J']) ? chop($arrData[$i + 9]['J'],'DR') : 0;
+                }else{
+                    $totalsttnse = isset($arrData[$i + 2]['L']) ? $arrData[$i + 2]['L'] : 0;
+                    $gstnse['CGST'] = isset($arrData[$i + 4]['L']) ? chop($arrData[$i + 4]['L'],'DR') : 0;
+                    $gstnse['SGST'] = isset($arrData[$i + 5]['L']) ? chop($arrData[$i + 5]['L'],'DR') : 0;
+                    $totaltransactionchargesnse = isset($arrData[$i + 6]['L']) ? chop($arrData[$i + 6]['L'],'DR') : 0;
+                    $sebinse = isset($arrData[$i + 9]['L']) ? chop($arrData[$i + 9]['L'],'DR') : 0;
+                    $totalstampdutynse = isset($arrData[$i + 7]['L']) ? chop($arrData[$i + 7]['L'],'DR') : 0;
+                }
+                    
+            }
+        }
+        $paramarr['contractnotenumber'] = $contractNumber;
+        $paramarr['entityid'] = $entityid;
+        $paramarr['transactiondate'] = $tradedate;
+        $paramarr['brokername'] = $brokername;
+        $paramarr['brokercode'] = $brokercode;
+        $row = 0;
+        
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($arrData[$i]['A']) && \strpos(\trim($arrData[$i]['A']), "NSECM") !== FALSE) {
+                $exchange = "NSE";
+                for ($j = $i + 1; $j < $count; $j++) {
+                    if (isset($arrData[$j]['A']) && \strpos(\trim($arrData[$j]['A']), "BSECM") !== FALSE || \strpos(\trim($arrData[$j]['A']), "NSEFO") !== FALSE) {
+                        break;
+                    }
+                    if (isset($arrData[$j]['A']) && isset($arrData[$j]['B']) && isset($arrData[$j]['C']) && isset($arrData[$j]['D']) && isset($arrData[$j]['E']) && isset($arrData[$j]['F']) && isset($arrData[$j]['G']) && isset($arrData[$j]['H']) && isset($arrData[$j]['I']) && isset($arrData[$j]['J']) && isset($arrData[$j]['L'])) {
+                        $arrNSE[] = $arrData[$j];
+                    }
+                    
+                }
+                
+            }
+        }
+
+        if (count($arrNSE) > 0) {
+            $arrval1 = $this->getHtmlContractNoteCommonvalue($arrNSE, $paramarr, $exchange, $contractNumber, $row);
+            $totalamount1 = array_sum(array_column($arrval1, 'amount'));
+            $totaltransactionchargesnse += $sebinse;
+            $arrval1 = $this->getcommoncalculation($totalservicetaxnse, $totalsttnse, $totaltransactionchargesnse, $totalstampdutynse, $totalotherchargesnse, $totalamount1, $arrval1, $gstnse);
+        }
+
+        for ($i = 0; $i < $count; $i++) {
+            if ( isset($arrData[$i]['A']) && \strpos(\trim($arrData[$i]['A']), "BSECM") !== FALSE) {
+
+                $exchange = "BSE";
+                for ($j = $i + 1; $j < $count; $j++) {
+                    if (isset($arrData[$j]['A']) && \strpos(\trim($arrData[$j]['A']), "NSECM") !== FALSE || \strpos(\trim($arrData[$j]['A']), "NSEFO")!== FALSE) {
+                        break;
+                    }
+                    if (isset($arrData[$j]['A']) && isset($arrData[$j]['E']) && isset($arrData[$j]['F']) && isset($arrData[$j]['G']) && isset($arrData[$j]['E']) && isset($arrData[$j]['F']) && isset($arrData[$j]['G']) && isset($arrData[$j]['H']) && isset($arrData[$j]['I']) && isset($arrData[$j]['J']) && isset($arrData[$j]['L'])) {
+                        $arrBSE[] = $arrData[$j];
+                    }
+                    
+                }
+            }
+        }
+        $row = isset($arrval1) && count($arrval1) > 0 ? count($arrval1) : 0;
+        if (count($arrBSE) > 0) {
+            $arrval2 = $this->getHtmlContractNoteCommonvalue($arrBSE, $paramarr, $exchange, $contractNumber, $row);
+            $totalamount = array_sum(array_column($arrval2, 'amount'));
+            $totaltransactionchargesbse += $sebibse;
+            $arrval2 = $this->getcommoncalculation($totalservicetaxbse, $totalsttbse, $totaltransactionchargesbse, $totalstampdutybse, $totalotherchargesbse, $totalamount, $arrval2, $gstbse);
+        }
+        $arrval = \array_merge($arrval1, $arrval2);
+//        echo '<pre>' . ' imhere ';
+//        print_r($arrval);
+//        echo '</pre>';
+//        die;
+        return $arrval;
+    }
+    
+    public function handlePdfICICISecurities($arrData, $commontransaction, $entityid) {
+        $arrData = str_replace("`", "", $arrData);
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\sNote\s+No\.\s+\:\s+([A-Za-z\/\d*]*)/';
+        $commondata['contractNameMatch'] = '/ICICI\s+Securities\s+Limited/';
+        $commondata['transactionDateMatch'] = '/TRADE\s+DATE\s+\:\s+(\d{2}\-\d{2}\-\d{4})/';
+        $commondata['brokercode'] = '/UCC\s+of\sClient\s+\:\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO\.\s+([A-Za-z\d]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\*\*\s+([\d\,\.\-]*)/';
+        $commondata['servicetax_match'] = '/a^/';
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+Turnover\s+Fees\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\*\*\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/CGST\*\s+Rate\(\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+(?:[\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/SGST\/UTGST\*\s+Rate\s+\(\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+(?:[\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/Capital\s+Market\s+Segment\s+of\s+NSE/';
+        $commondata['ExchangeBse_match'] = '/Capital\s+Market\s+Segment\s+of\s+BSE/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{4})\s+(\d*)\s+(\d{2}\:\d{2})\s+([\s+A-Za-z\d\.\(\)\-’\&]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 11;
+        $position['contractNoteName'] = 'ICICI Securities';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = 9;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 11;
+        $position['amount'] = 11;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfMotilalContractNote($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO\.\s+([A-Za-z\d\/]*)/';
+        $commondata['transactionDateMatch'] = '/TRADE\s+DATE\s+(\w{3}\s+\d*\s+\d{4})/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO\.\s+([\d]*)/';
+        $commondata['brokercode'] = '/UCC\s+Code\:\s+([\w\d\.\,\-]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+\s+([\d\.\,\-]*)\s+([\d\.\,\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+turnover\s+Fees\s+\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['CGST_match'] = '/CGST\s+\(\@\d*\.\d*\%\w*\s+\w*\)\(Rs\)\s+([\d\.\,\-]*)\s+([\d\.\,\-]*)/';
+        $commondata['SGST_match'] = '/SGST\s+\(\@\d*\.\d*\%\w*\s+\w*\)\(Rs\)\s+([\d\.\,\-]*)\s+([\d\.\,\-]*)/';
+        $commondata['IGST_match'] = '/IGST\s+\(\@\d*\.\d*\%\w*\s+\w*\)\(Rs\)\s+([\d\.\,\-]*)\s+([\d\.\,\-]*)/';
+        $commondata['UTGST_match'] = '/UTT\s+\(\@\d*\.\d*\%\w*\s+\w*\)\(Rs\)\s+([\d\.\,\-]*)\s+([\d\.\,\-]*)/';
+
+        $commondata['ExchangeNse_match'] = '/NSE-Capital\s+Market/';
+        $commondata['ExchangeBse_match'] = '/BSE-Capital\s+Market/';
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z\d\.\(\)\-’\&]*)\s+(B|S)\s+([\d\,\.\-]*)\s+(\w)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 15;
+
+        $position['contractNoteName'] = 'MOTILAL OSWAL';
+        $position['orderno'] = '';
+        $position['ordertime'] = '';
+        $position['tradeno'] = '';
+        $position['tradetime'] = '';
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 9;
+        $position['brokerage'] = 10;
+        $position['netrateperunit'] = 11;
+        $position['nettotalbeforelevis'] = 15;
+        $position['amount'] = 15;
+
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePhillipCapitalPdf($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\s+NOTE\s+NO.\s+(\d*)/';
+        $commondata['contractNameMatch'] = '/PHILLIPCAPITAL\s+\(\INDIA\)\s+PVT\s+LTD/';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+(\w{3}\s+\d{1,2}\s+\d{4})/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+NO.\s+(\d*)/';
+        $commondata['brokercode'] = '/UCC\s+Code\:\s+([A-Za-z\d\/]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['transactioncharges_match'] = '/Exchange\s+Transaction\s+Charges\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+turnover\s+Fees\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/CGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/SGST\s+\(\@\d*\.\d*\%\)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['ExchangeNse_match'] = '/NSE\-\Capital\s+Market/';
+//        $commondata['ExchangeBse_match'] = '/BSE\s+\-\s+CAPITAL/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s*([\s+A-Za-z\.\(\)\-’\&]*)\s+(BUY|SELL)\s+([\d\,\.\-]*)\s+([\w]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 13;
+        $position['contractNoteName'] = 'PhillipCapital (India) Pvt Ltd';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 9;
+        $position['brokerage'] = 10;
+        $position['netrateperunit'] = 11;
+        $position['amount'] = 13;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfCharteredSecuritiesIndia($arrData, $commontransaction, $entityid) {
+//        $arrData = str_replace("`","",$arrData);
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\sNote\s+No\.\s+\:\s+([A-Za-z\/\d*]*)/';
+        $commondata['contractNameMatch'] = '/Chartered\sSecurities\s\(\India\)\sLtd/';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['brokercode'] = '/UCC\s+Code\s+\:\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/Settlement\s+Number\s+\:\s+([A-Za-z\d]*)/';
+        $commondata['stt_totalmatch'] = '/Total\s+STT\s+([\d\,\.\-]*)/';
+        $commondata['servicetax_match'] = '/a^/';
+        $commondata['transactioncharges_match'] = '/\[\TRASACTION\s+CHARGES\]\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/a^/';
+        $commondata['StampDuty_match'] = '/\[\s+STAMP\s+DUTY\]\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/a^/';
+        $commondata['SGST_match'] = '/INTER\sSTATE\sGST\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/\[IGST\sON\sTXN\sCHGS\]\s+([\d\,\.\-]*)/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/Exchange\s\:\s+NSE/';
+        $commondata['ExchangeBse_match'] = '/Exchange\s+\:\s+BSE/';
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z\d\.\(\)\-’\&]*)\s+(B|S)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 12;
+        $position['contractNoteName'] = 'Standard Chartered Securities India Ltd';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = 9;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 12;
+        $position['amount'] = 12;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+    public function handlePdfKNAShareBrokersPvt($arrData, $commontransaction, $entityid) {
+
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\snote\s+no\s+([A-Za-z\/\d*]*)/';
+        $commondata['contractNameMatch'] = '/KNA\sSHARE\sBROKERS\sPVT\sLTD/';
+        $commondata['transactionDateMatch'] = '/Trade\s+date\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['brokercode'] = '/UCC\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/Settlements\s+No\s+([A-Za-z\d]*)/';
+        $commondata['stt_match'] = '/STT\:\s+([\d\,\.\-]*)/';
+        $commondata['servicetax_match'] = '/a^/';
+        $commondata['transactioncharges_match'] = '/Exchange\sTransaction\s+charges\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+Charges\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+charges\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/Central\s+GST\s+\@\s\d*\.\d*\s\%\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/State\s+GST\s+\@\s\d*\.\d*\s\%\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/National\sStock\sExchange/';
+        $commondata['ExchangeBse_match'] = '/a^/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z\d\.\(\)\-’\&\[\]]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 12;
+        $position['contractNoteName'] = 'KNA Share Brokers Pvt Ltd';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = 9;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 12;
+        $position['amount'] = 12;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+    public function handlePdfZerodhaBrokingLtd($arrData, $commontransaction, $entityid) {
+       
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/CONTRACT\sNOTE\s+NO\.\:\s+CNT\-\d{2}\/\d{2}\-([A-Za-z\/\d*]*)/';
+        $commondata['contractNameMatch'] = '/ZERODHA\sBROKING\sLIMITED/';
+        $commondata['transactionDateMatch'] = '/TRADE\s+DATE\s+(\d{4}\-\d{2}\-\d{2})/';
+        $commondata['brokercode'] = '/UCC\s+of\s+Client\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/SETTLEMENT\s+No\s+([A-Za-z\d]*)/';
+        $commondata['stt_match'] = '/Securities\s+Transaction\s+Tax\s+\(([\d\,\.\-]*)\)/';
+        $commondata['servicetax_match'] = '/a^/';
+        $commondata['transactioncharges_match'] = '/Exchange\sTransaction\s+Charges\s+\(([\d\,\.\-]*)\)/';
+        $commondata['sebi_match'] = '/SEBI\s+Turnover\s+Fees\s+\(([\d\,\.\-]*)\)/';
+        $commondata['StampDuty_match'] = '/Stamp\s+Duty\s+\(([\d\,\.\-]*)\)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/CGST\s+\(\@\d*\%\s+of\s+Brok\,\s+Trans\s+\&\s+Clearing\s+Charges\)\d*\s+\(([\d\,\.\-]*)\)/';
+        $commondata['SGST_match'] = '/SGST\s+\(\@\d*\%\s+of\s+Brok\,\s+Trans\s+\&\s+Clearing\s+Charges\)\d*\s+\(([\d\,\.\-]*)\)/';
+        $commondata['IGST_match'] = '/IGST\s+\(\@\d*\%\s+of\s+Brok\,\s+Trans\s+\&\s+Clearing\s+Charges\)\d*\s+\(([\d\,\.\-]*)\)/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/NSE-EQ/';
+        $commondata['ExchangeBse_match'] = '/a^/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z]*)\/\s+(B|S)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+\(([\d\,\.\-]*)\)/';
+        $commondata['count'] = 10;
+        $position['contractNoteName'] = 'Zerodha Broking Ltd';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = '';
+        $position['netrateperunit'] = 9;
+        $position['nettotalbeforelevis'] = 9;
+        $position['amount'] = 10;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+    
+    public function handlePdfSykesAndRay($arrData, $commontransaction, $entityid) {
+       
+        $commondata = array();
+        $position = array();
+
+        $commondata['contractNoteMatch'] = '/Contract\s+No\s+\:\s+([A-Za-z\d*]*)/';
+        $commondata['contractNameMatch'] = '/SYKES\s+\&\s+RAY\s+EQUITIES/';
+        $commondata['transactionDateMatch'] = '/Trade\s+Date\s+\:\s+(\d{2}\/\d{2}\/\d{4})/';
+        $commondata['brokercode'] = '/UCC\/\Client\s+Code\s+\:\s+([A-Za-z\d\/]*)/';
+        $commondata['settlement_match'] = '/Settlement\s+No\s+\:\s+([A-Za-z\-\d]*)/';
+        $commondata['stt_match'] = '/Security\s+Turn\s+Over\s+Tax\s+(([\d\,\.\-]*))/';
+        $commondata['servicetax_match'] = '/a^/';
+        $commondata['transactioncharges_match'] = '/Transaction\s+Charges\s+\[\Special\]\s+([\d\,\.\-]*)/';
+        $commondata['sebi_match'] = '/SEBI\s+TURNOVER\s+CHRGS\s+([\d\,\.\-]*)/';
+        $commondata['StampDuty_match'] = '/STAMP\s+DUTY\s+([\d\,\.\-]*)/';
+        $commondata['OtherCharg_match'] = '/a^/';
+        $commondata['CGST_match'] = '/Central\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)/';
+        $commondata['SGST_match'] = '/State\s+GST\s+\@\s+\d*\%\s+([\d\,\.\-]*)/';
+        $commondata['IGST_match'] = '/a^/';
+        $commondata['UTGST_match'] = '/a^/';
+        $commondata['ExchangeNse_match'] = '/a^/';
+        $commondata['ExchangeBse_match'] = '/BSE\s+Capital\s+Market/';
+
+        $commondata['match_str'] = '/(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+(\d*)\s+(\d{2}\:\d{2}\:\d{2})\s+([\s+A-Za-z]*)\s+(Buy|Sell)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)\s+([\d\,\.\-]*)/';
+        $commondata['count'] = 11;
+        $position['contractNoteName'] = 'Sykes & Ray Equities India Ltd';
+        $position['orderno'] = 1;
+        $position['ordertime'] = 2;
+        $position['tradeno'] = 3;
+        $position['tradetime'] = 4;
+        $position['scripname'] = 5;
+        $position['txntype'] = 6;
+        $position['units'] = 7;
+        $position['grossrateperunit'] = 8;
+        $position['brokerage'] = 9;
+        $position['netrateperunit'] = 10;
+        $position['nettotalbeforelevis'] = 10;
+        $position['amount'] = 11;
+        $param = $this->commonfunctionForAllContractNote($arrData, $commontransaction, $entityid, $commondata, $position);
+
+        return $param;
+    }
+
+}
